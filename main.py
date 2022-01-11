@@ -163,10 +163,10 @@ def editor(screen):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exit()
-            elif event.type == pygame.K_ESCAPE:
-                running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_ESCAPE:
+                    return None
+                elif event.key == pygame.K_SPACE:
                     sprite = pygame.sprite.spritecollideany(cursor, tiles_group)
                     if sprite is not None:
                         sprite.change()
@@ -196,10 +196,10 @@ def runner(screen, level):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exit()
-            elif event.type == pygame.K_ESCAPE:
-                running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_ESCAPE:
+                    return None
+                elif event.key == pygame.K_SPACE:
                     all_sprites = pygame.sprite.Group()
                     tiles_group = pygame.sprite.Group()
                     wall_group = pygame.sprite.Group()
@@ -216,7 +216,6 @@ def runner(screen, level):
                 elif event.key == pygame.K_RIGHT:
                     player.move(1, 0)
 
-
         if len(pygame.sprite.groupcollide(box_group, win_group, None, None)) == len(win_group):
             break
 
@@ -227,8 +226,13 @@ def runner(screen, level):
         pygame.display.flip()
 
 
-editor(screen)
+def clear_vars():
+    for i in (all_sprites, tiles_group, wall_group, box_group, win_group, player_group, cursor_group):
+        i = pygame.sprite.Group()
 
+
+runner(screen, "0.txt")
+clear_vars()
 running = True
 
 while running:
@@ -237,3 +241,4 @@ while running:
             running = False
 
     screen.fill((0, 0, 0))
+    pygame.display.flip()
