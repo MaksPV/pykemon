@@ -52,7 +52,7 @@ tile_images = {
     'wall': load_image('wall.png'),
     'box': load_image('box.png'),
     "win": load_image('win.png'),
-    "player": load_image('mario.png')
+    "player": load_image('mario.png', -1)
 }
 
 player_image = tile_images["player"]
@@ -150,6 +150,19 @@ def generate_level(level):
     return new_player, x, y
 
 
+def generate_level_from_editor(tile_group):
+    dict_to_sym = {"wall": "#", "win": "!", "player": "@", "box": "$", "empty": "."}
+    map_ = [["." for _ in range(width // tile_width)] for _ in range(height // tile_height)]
+    for i in tile_group:
+        x = i.rect.left // tile_width
+        y = i.rect.top // tile_height
+        symbol = dict_to_sym[i.tile_type]
+        print(x, y)
+        map_[x][y] = symbol
+    print(map_)
+    return map_
+
+
 def editor(screen):
     cursor = Cursor(0, 0)
 
@@ -165,7 +178,7 @@ def editor(screen):
                 exit()
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    return None
+                    return generate_level_from_editor(tiles_group)
                 elif event.key == pygame.K_SPACE:
                     sprite = pygame.sprite.spritecollideany(cursor, tiles_group)
                     if sprite is not None:
@@ -188,38 +201,41 @@ def editor(screen):
 def runner(screen, level):
     global all_sprites, tiles_group, wall_group, box_group, win_group, player_group
 
-    player, level_x, level_y = generate_level(load_level(level))
+    player, level_x, level_y = generate_level(level)
 
     running = True
     clock = pygame.time.Clock()
+    last_pressed = 0
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    return None
-                elif event.key == pygame.K_SPACE:
+                if event.key == pygame.K_SPACE:
                     all_sprites = pygame.sprite.Group()
                     tiles_group = pygame.sprite.Group()
                     wall_group = pygame.sprite.Group()
                     box_group = pygame.sprite.Group()
                     win_group = pygame.sprite.Group()
                     player_group = pygame.sprite.Group()
-                    player, level_x, level_y = generate_level(load_level(level))
-                if event.key == pygame.K_UP:
-                    player.move(0, -1)
-                elif event.key == pygame.K_DOWN:
-                    player.move(0, 1)
-                if event.key == pygame.K_LEFT:
-                    player.move(-1, 0)
-                elif event.key == pygame.K_RIGHT:
-                    player.move(1, 0)
+                    player, level_x, level_y = generate_level(level)
+
+        if pygame.time.get_ticks() - last_pressed > 100:
+            last_pressed = pygame.time.get_ticks()
+            buttons = pygame.key.get_pressed()
+            if buttons[pygame.K_UP]:
+                player.move(0, -1)
+            elif buttons[pygame.K_DOWN]:
+                player.move(0, 1)
+            if buttons[pygame.K_LEFT]:
+                player.move(-1, 0)
+            elif buttons[pygame.K_RIGHT]:
+                player.move(1, 0)
 
         if len(pygame.sprite.groupcollide(box_group, win_group, None, None)) == len(win_group):
             break
 
-        clock.tick(5)
+        clock.tick(60)
         tiles_group.draw(screen)
         player_group.draw(screen)
         box_group.draw(screen)
@@ -227,12 +243,12 @@ def runner(screen, level):
 
 
 def clear_vars():
+    global all_sprites, tiles_group, wall_group, box_group, win_group, player_group, cursor_group
     for i in (all_sprites, tiles_group, wall_group, box_group, win_group, player_group, cursor_group):
         i = pygame.sprite.Group()
 
 
-runner(screen, "0.txt")
-clear_vars()
+runner(screen, load_level("1.txt"))
 running = True
 
 while running:
