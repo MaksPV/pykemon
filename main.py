@@ -7,6 +7,15 @@ pygame.display.set_caption('mario')
 size = width, height = 800, 600
 screen = pygame.display.set_mode(size)
 
+# группы спрайтов
+all_sprites = pygame.sprite.Group()
+tiles_group = pygame.sprite.Group()
+wall_group = pygame.sprite.Group()
+box_group = pygame.sprite.Group()
+win_group = pygame.sprite.Group()
+player_group = pygame.sprite.Group()
+cursor_group = pygame.sprite.Group()
+
 
 def load_image(name, colorkey=None):
     fullname = os.path.join('data', name)
@@ -27,10 +36,10 @@ def load_image(name, colorkey=None):
 
 def load_level(filename):
     fullname = "data/levels/" + filename
-    
+
     with open(fullname, 'r') as mapFile:
         level_map = [line.strip() for line in mapFile]
-        
+
     # и подсчитываем максимальную длину
     max_width = max(map(len, level_map))
 
@@ -39,26 +48,46 @@ def load_level(filename):
 
 
 tile_images = {
-    'wall': load_image('wall.png'),
     'empty': load_image('grass.png'),
+    'wall': load_image('wall.png'),
     'box': load_image('box.png'),
-    "win": load_image('win.png')
+    "win": load_image('win.png'),
+    "player": load_image('mario.png')
 }
-player_image = load_image('mario.png')
 
+player_image = tile_images["player"]
 tile_width = tile_height = 50
+
+
+class Cursor(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y):
+        super().__init__(cursor_group, all_sprites)
+        self.image = load_image('cursor.png', -1)
+        self.rect = self.image.get_rect().move(
+            tile_width * pos_x, tile_height * pos_y)
+
+    def move(self, x, y):
+        x, y = x * tile_width, y * tile_height
+        self.rect.x = (self.rect.x + x) % width
+        self.rect.y = (self.rect.y + y) % height
 
 
 class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
         super().__init__(tiles_group, all_sprites)
         self.image = tile_images[tile_type]
+        self.tile_type = tile_type
         self.rect = self.image.get_rect().move(
             tile_width * pos_x, tile_height * pos_y)
         if tile_type == "wall":
             wall_group.add(self)
         elif tile_type == "win":
             win_group.add(self)
+
+    def change(self):
+        types = list(tile_images)
+        self.tile_type = types[(types.index(self.tile_type) + 1) % len(types)]
+        self.image = tile_images[self.tile_type]
 
 
 class Player(pygame.sprite.Sprite):
@@ -78,7 +107,6 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.rect.move(x, y)
         if any([pygame.sprite.spritecollideany(self, i) for i in (wall_group, box_group)]):
             self.rect = last_rect
-            
 
 
 class Box(pygame.sprite.Sprite):
@@ -95,23 +123,11 @@ class Box(pygame.sprite.Sprite):
         last_rect = self.rect
         self.rect = self.rect.move(x, y)
         if pygame.sprite.spritecollideany(self, wall_group) or \
-            len(pygame.sprite.spritecollide(self, box_group, None)) > 1:
+                len(pygame.sprite.spritecollide(self, box_group, None)) > 1:
             self.rect = last_rect
         else:
             self.x += x_pos
             self.y += y_pos
-
-
-# основной персонаж
-player = None
-
-# группы спрайтов
-all_sprites = pygame.sprite.Group()
-tiles_group = pygame.sprite.Group()
-wall_group = pygame.sprite.Group()
-box_group = pygame.sprite.Group()
-win_group = pygame.sprite.Group()
-player_group = pygame.sprite.Group()
 
 
 def generate_level(level):
@@ -134,68 +150,90 @@ def generate_level(level):
     return new_player, x, y
 
 
-def start_screen():
-    intro_text = ["Марио", "",
-                  "Правила игры",
-                  "Анархия, кровь, мясо,",
-                  "телепортация"]
+def editor(screen):
+    cursor = Cursor(0, 0)
 
-    fon = pygame.transform.scale(load_image('fon.jpg'), (width, height))
-    screen.blit(fon, (0, 0))
-    font = pygame.font.Font(None, 30)
-    text_coord = 50
-    for line in intro_text:
-        string_rendered = font.render(line, 1, pygame.Color('white'))
-        intro_rect = string_rendered.get_rect()
-        text_coord += 10
-        intro_rect.top = text_coord
-        intro_rect.x = 10
-        text_coord += intro_rect.height
-        screen.blit(string_rendered, intro_rect)
+    for x in range(width // tile_width):
+        for y in range(height // tile_height):
+            Tile("empty", x, y)
 
-    while True:
+    running = True
+    clock = pygame.time.Clock()
+    while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                terminate()
-            elif event.type == pygame.KEYDOWN or \
-                    event.type == pygame.MOUSEBUTTONDOWN:
-                return  # начинаем игру
+                exit()
+            elif event.type == pygame.K_ESCAPE:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    sprite = pygame.sprite.spritecollideany(cursor, tiles_group)
+                    if sprite is not None:
+                        sprite.change()
+                if event.key == pygame.K_UP:
+                    cursor.move(0, -1)
+                elif event.key == pygame.K_DOWN:
+                    cursor.move(0, 1)
+                if event.key == pygame.K_LEFT:
+                    cursor.move(-1, 0)
+                elif event.key == pygame.K_RIGHT:
+                    cursor.move(1, 0)
+        clock.tick(25)
+        screen.fill((0, 0, 0))
+        tiles_group.draw(screen)
+        cursor_group.draw(screen)
         pygame.display.flip()
 
 
-def win():
-    exit()
+def runner(screen, level):
+    global all_sprites, tiles_group, wall_group, box_group, win_group, player_group
+
+    player, level_x, level_y = generate_level(load_level(level))
+
+    running = True
+    clock = pygame.time.Clock()
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                exit()
+            elif event.type == pygame.K_ESCAPE:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    all_sprites = pygame.sprite.Group()
+                    tiles_group = pygame.sprite.Group()
+                    wall_group = pygame.sprite.Group()
+                    box_group = pygame.sprite.Group()
+                    win_group = pygame.sprite.Group()
+                    player_group = pygame.sprite.Group()
+                    player, level_x, level_y = generate_level(load_level(level))
+                if event.key == pygame.K_UP:
+                    player.move(0, -1)
+                elif event.key == pygame.K_DOWN:
+                    player.move(0, 1)
+                if event.key == pygame.K_LEFT:
+                    player.move(-1, 0)
+                elif event.key == pygame.K_RIGHT:
+                    player.move(1, 0)
 
 
-player, level_x, level_y = generate_level(load_level("1.txt"))
+        if len(pygame.sprite.groupcollide(box_group, win_group, None, None)) == len(win_group):
+            break
+
+        clock.tick(5)
+        tiles_group.draw(screen)
+        player_group.draw(screen)
+        box_group.draw(screen)
+        pygame.display.flip()
+
+
+editor(screen)
 
 running = True
-clock = pygame.time.Clock()
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    if len(pygame.sprite.groupcollide(box_group, win_group, None, None)) == len(win_group):
-        win()
-    buttons = pygame.key.get_pressed()
-    if buttons[pygame.K_SPACE]:
-        all_sprites = pygame.sprite.Group()
-        tiles_group = pygame.sprite.Group()
-        wall_group = pygame.sprite.Group()
-        box_group = pygame.sprite.Group()
-        win_group = pygame.sprite.Group()
-        player_group = pygame.sprite.Group()
-        player, level_x, level_y = generate_level(load_level("1.txt"))
-    if buttons[pygame.K_UP]:
-        player.move(0, -1)
-    elif buttons[pygame.K_DOWN]:
-        player.move(0, 1)
-    if buttons[pygame.K_LEFT]:
-        player.move(-1, 0)
-    elif buttons[pygame.K_RIGHT]:
-        player.move(1, 0)
-    clock.tick(5)
-    tiles_group.draw(screen)
-    player_group.draw(screen)
-    box_group.draw(screen)
-    pygame.display.flip()
+
+    screen.fill((0, 0, 0))
