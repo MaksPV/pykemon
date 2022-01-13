@@ -99,13 +99,14 @@ class Player(pygame.sprite.Sprite):
 
     def move(self, x, y):
         x, y = x * tile_width, y * tile_height
-        x1, y1 = self.rect.move(x, y)[0] // tile_width, self.rect.move(x, y)[1] // tile_height,
+        x1, y1 = self.rect.move(x, y)[0] // tile_width, self.rect.move(x, y)[1] // tile_height
         for i in box_group:
             if x1 == i.x and y1 == i.y:
                 i.move(x // tile_width, y // tile_height)
         last_rect = self.rect
         self.rect = self.rect.move(x, y)
-        if any([pygame.sprite.spritecollideany(self, i) for i in (wall_group, box_group)]):
+        if any([pygame.sprite.spritecollideany(self, i) for i in (wall_group, box_group)]) or not (
+                0 <= self.rect.x <= width) or not (0 <= self.rect.y <= height):
             self.rect = last_rect
 
 
@@ -123,7 +124,8 @@ class Box(pygame.sprite.Sprite):
         last_rect = self.rect
         self.rect = self.rect.move(x, y)
         if pygame.sprite.spritecollideany(self, wall_group) or \
-                len(pygame.sprite.spritecollide(self, box_group, None)) > 1:
+                len(pygame.sprite.spritecollide(self, box_group, None)) > 1 or not (
+                0 <= self.rect.x <= width) or not (0 <= self.rect.y <= height):
             self.rect = last_rect
         else:
             self.x += x_pos
@@ -154,12 +156,10 @@ def generate_level_from_editor(tile_group):
     dict_to_sym = {"wall": "#", "win": "!", "player": "@", "box": "$", "empty": "."}
     map_ = [["." for _ in range(width // tile_width)] for _ in range(height // tile_height)]
     for i in tile_group:
-        x = i.rect.left // tile_width
-        y = i.rect.top // tile_height
+        x = i.rect.x // tile_width
+        y = i.rect.y // tile_height
         symbol = dict_to_sym[i.tile_type]
-        print(x, y)
-        map_[x][y] = symbol
-    print(map_)
+        map_[y][x] = symbol
     return map_
 
 
@@ -245,10 +245,19 @@ def runner(screen, level):
 def clear_vars():
     global all_sprites, tiles_group, wall_group, box_group, win_group, player_group, cursor_group
     for i in (all_sprites, tiles_group, wall_group, box_group, win_group, player_group, cursor_group):
-        i = pygame.sprite.Group()
+        i.empty()
 
 
-runner(screen, load_level("1.txt"))
+def save_level(level, name):
+    new = level.copy()
+    for k, i in enumerate(level):
+        new[k] = "".join(i)
+    new = "\n".join(new)
+    with open("data/levels/" + name, "w") as f:
+        f.write(new)
+        f.close()
+
+
 running = True
 
 while running:
