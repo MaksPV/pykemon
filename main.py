@@ -202,25 +202,28 @@ def runner(screen, level):
     global all_sprites, tiles_group, wall_group, box_group, win_group, player_group
 
     player, level_x, level_y = generate_level(level)
+    if player is None:
+        return None
+
+    font = pygame.font.Font(None, 36)
+    start_time = pygame.time.get_ticks()
 
     running = True
-    clock = pygame.time.Clock()
     last_pressed = 0
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    all_sprites = pygame.sprite.Group()
-                    tiles_group = pygame.sprite.Group()
-                    wall_group = pygame.sprite.Group()
-                    box_group = pygame.sprite.Group()
-                    win_group = pygame.sprite.Group()
-                    player_group = pygame.sprite.Group()
+                if event.key == pygame.K_ESCAPE:
+                    clear_vars()
+                    return None
+                elif event.key == pygame.K_SPACE:
+                    clear_vars()
+                    start_time = pygame.time.get_ticks()
                     player, level_x, level_y = generate_level(level)
 
-        if pygame.time.get_ticks() - last_pressed > 100:
+        if pygame.time.get_ticks() - last_pressed > 200:
             last_pressed = pygame.time.get_ticks()
             buttons = pygame.key.get_pressed()
             if buttons[pygame.K_UP]:
@@ -235,10 +238,14 @@ def runner(screen, level):
         if len(pygame.sprite.groupcollide(box_group, win_group, None, None)) == len(win_group):
             break
 
-        clock.tick(60)
         tiles_group.draw(screen)
         player_group.draw(screen)
         box_group.draw(screen)
+
+        timer_text = font.render(f"Время: {(pygame.time.get_ticks() - start_time) // 1000} сек.",
+                                 True, (255, 255, 255), (0, 128, 0))
+        screen.blit(timer_text, (10, 10))
+
         pygame.display.flip()
 
 
@@ -258,12 +265,62 @@ def save_level(level, name):
         f.close()
 
 
+def menu(screen):
+    font = pygame.font.Font(None, 110)
+    text1 = font.render("СКЛАД 12", True, (0, 100, 50))
+    background = load_image("background.png")
+    font2 = pygame.font.Font(None, 50)
+
+    choose_lvl_text = font2.render("Выберите уровень", True, (0, 0, 0))
+
+    running = True
+
+    files = os.listdir("data/levels")
+    files = sorted(files, key=lambda x: int(x[:-4]))
+    now_file = files[0]
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RIGHT:
+                    now_file = files[(files.index(now_file) + 1) % len(files)]
+                elif event.key == pygame.K_LEFT:
+                    now_file = files[(files.index(now_file) - 1) % len(files)]
+                elif event.key == pygame.K_SPACE:
+                    clear_vars()
+                    runner(screen, load_level(now_file))
+                elif event.key == pygame.K_e:
+                    level = editor(screen)
+                    if int(files[-1][:-4]) >= 1000:
+                        name = int(files[-1][:-4]) + 1
+                        name = str(name) + ".txt"
+                    else:
+                        name = "1000.txt"
+                    save_level(level, name)
+
+        screen.fill((0, 0, 0))
+        screen.blit(background, (0, 0))
+
+        rectangle = pygame.surface.Surface((width // 6 + width // 2, height // 2 + height // 10))
+        rectangle.set_alpha(200)
+        rectangle.fill((255, 255, 255))
+        screen.blit(rectangle, (width // 6, height // 10))
+
+        place = text1.get_rect(center=(width // 2, height // 4))
+        screen.blit(text1, place)
+
+        text_now_level = font2.render(now_file[:-4], True, (0, 0, 0))
+        place = text_now_level.get_rect(center=(width // 2, height // 2))
+        screen.blit(text_now_level, place)
+
+        place = choose_lvl_text.get_rect(center=(width // 2, height // 2 - 45))
+        screen.blit(choose_lvl_text, place)
+
+        pygame.display.flip()
+
+
 running = True
 
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-
-    screen.fill((0, 0, 0))
-    pygame.display.flip()
+menu(screen)
