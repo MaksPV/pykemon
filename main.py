@@ -3,7 +3,7 @@ import os
 import sys
 
 pygame.init()
-pygame.display.set_caption('mario')
+pygame.display.set_caption('Склад 12')
 size = width, height = 800, 600
 screen = pygame.display.set_mode(size)
 
@@ -17,6 +17,7 @@ player_group = pygame.sprite.Group()
 cursor_group = pygame.sprite.Group()
 
 
+# Функция для загрузки изображений
 def load_image(name, colorkey=None):
     fullname = os.path.join('data', name)
     # если файл не существует, то выходим
@@ -34,6 +35,7 @@ def load_image(name, colorkey=None):
     return image
 
 
+# Функция для загрузки уровней
 def load_level(filename):
     fullname = "data/levels/" + filename
 
@@ -47,6 +49,7 @@ def load_level(filename):
     return list(map(lambda x: x.ljust(max_width, '.'), level_map))
 
 
+# Изображения
 tile_images = {
     'empty': load_image('grass.png'),
     'wall': load_image('wall.png'),
@@ -59,19 +62,23 @@ player_image = tile_images["player"]
 tile_width = tile_height = 50
 
 
+# Класс курсора для редактора
 class Cursor(pygame.sprite.Sprite):
+    # Инициализация
     def __init__(self, pos_x, pos_y):
         super().__init__(cursor_group, all_sprites)
         self.image = load_image('cursor.png', -1)
         self.rect = self.image.get_rect().move(
             tile_width * pos_x, tile_height * pos_y)
 
+    # Движение
     def move(self, x, y):
         x, y = x * tile_width, y * tile_height
         self.rect.x = (self.rect.x + x) % width
         self.rect.y = (self.rect.y + y) % height
 
 
+# Класс тайла
 class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
         super().__init__(tiles_group, all_sprites)
@@ -79,37 +86,62 @@ class Tile(pygame.sprite.Sprite):
         self.tile_type = tile_type
         self.rect = self.image.get_rect().move(
             tile_width * pos_x, tile_height * pos_y)
+        # Определение, занесение в нужную группу
         if tile_type == "wall":
             wall_group.add(self)
         elif tile_type == "win":
             win_group.add(self)
 
+    # Смена типа тайла
     def change(self):
         types = list(tile_images)
         self.tile_type = types[(types.index(self.tile_type) + 1) % len(types)]
         self.image = tile_images[self.tile_type]
 
 
+# Класс игрока
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(player_group, all_sprites)
-        self.image = player_image
+        self.frames = []
+        self.cut_sheet(load_image("pikachu1.png", -1), 4, 4)
+        self.cur_frame = 0
+        self.image = self.frames[self.cur_frame]
         self.rect = self.image.get_rect().move(
-            tile_width * pos_x + 15, tile_height * pos_y + 5)
+            tile_width * pos_x, tile_height * pos_y)
 
+    # Режем изображение спрайта
+    def cut_sheet(self, sheet, columns, rows):
+        self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
+                                sheet.get_height() // rows)
+        for j in range(rows):
+            for i in range(columns):
+                frame_location = (self.rect.w * i, self.rect.h * j)
+                self.frames.append(sheet.subsurface(pygame.Rect(
+                    frame_location, self.rect.size)))
+
+    # Обновляем спрайт
+    def update(self):
+        self.cur_frame = (self.cur_frame + 1) % len(self.frames)
+        self.image = self.frames[self.cur_frame]
+
+    # Двигаемся
     def move(self, x, y):
         x, y = x * tile_width, y * tile_height
         x1, y1 = self.rect.move(x, y)[0] // tile_width, self.rect.move(x, y)[1] // tile_height
+        # Если находим ящик на месте следующего положения, то пытаемся толкнуть
         for i in box_group:
             if x1 == i.x and y1 == i.y:
                 i.move(x // tile_width, y // tile_height)
         last_rect = self.rect
         self.rect = self.rect.move(x, y)
+        # Если будет столкновение с стеной и ящиком или выйдет за пределы экрана, то возвращаем предыдущее положение
         if any([pygame.sprite.spritecollideany(self, i) for i in (wall_group, box_group)]) or not (
                 0 <= self.rect.x <= width) or not (0 <= self.rect.y <= height):
             self.rect = last_rect
 
 
+# Класс ящика
 class Box(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(box_group, all_sprites)
@@ -118,20 +150,24 @@ class Box(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(
             tile_width * pos_x, tile_height * pos_y)
 
+    # Движение
     def move(self, x, y):
         x_pos, y_pos = x, y
         x, y = x * tile_width, y * tile_height
         last_rect = self.rect
         self.rect = self.rect.move(x, y)
+        # Если будет столкновение с стеной и ящиком или выйдет за пределы экрана, то возвращаем предыдущее положение
         if pygame.sprite.spritecollideany(self, wall_group) or \
                 len(pygame.sprite.spritecollide(self, box_group, None)) > 1 or not (
                 0 <= self.rect.x <= width) or not (0 <= self.rect.y <= height):
             self.rect = last_rect
+        # Иначе обновляем координаты согласно клеточному полю
         else:
             self.x += x_pos
             self.y += y_pos
 
 
+# Создаём уровень из списка
 def generate_level(level):
     new_player, x, y = None, None, None
     for y in range(len(level)):
@@ -152,6 +188,7 @@ def generate_level(level):
     return new_player, x, y
 
 
+# Создаём список из редактора
 def generate_level_from_editor(tile_group):
     dict_to_sym = {"wall": "#", "win": "!", "player": "@", "box": "$", "empty": "."}
     map_ = [["." for _ in range(width // tile_width)] for _ in range(height // tile_height)]
@@ -163,26 +200,32 @@ def generate_level_from_editor(tile_group):
     return map_
 
 
+# Редактор уровня
 def editor(screen):
     cursor = Cursor(0, 0)
 
+    # Заполняем экран тайлами
     for x in range(width // tile_width):
         for y in range(height // tile_height):
             Tile("empty", x, y)
 
     running = True
     clock = pygame.time.Clock()
+    # Основной цикл
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exit()
             elif event.type == pygame.KEYDOWN:
+                # Если нажата Escape, то завершаем функцию и возвращаем список
                 if event.key == pygame.K_ESCAPE:
                     return generate_level_from_editor(tiles_group)
+                # Если пробел, то меняем тип тайла под курсором
                 elif event.key == pygame.K_SPACE:
                     sprite = pygame.sprite.spritecollideany(cursor, tiles_group)
                     if sprite is not None:
                         sprite.change()
+                # Движение курсора
                 if event.key == pygame.K_UP:
                     cursor.move(0, -1)
                 elif event.key == pygame.K_DOWN:
@@ -191,16 +234,20 @@ def editor(screen):
                     cursor.move(-1, 0)
                 elif event.key == pygame.K_RIGHT:
                     cursor.move(1, 0)
+
         clock.tick(25)
         screen.fill((0, 0, 0))
+        # Изображаем всё на экране
         tiles_group.draw(screen)
         cursor_group.draw(screen)
         pygame.display.flip()
 
 
+# Функция запуска уровня
 def runner(screen, level):
     global all_sprites, tiles_group, wall_group, box_group, win_group, player_group
 
+    # Получаем уровень
     player, level_x, level_y = generate_level(level)
     if player is None:
         return None
@@ -210,20 +257,24 @@ def runner(screen, level):
 
     running = True
     last_pressed = 0
+    clock = pygame.time.Clock()
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exit()
             elif event.type == pygame.KEYDOWN:
+                # Если нанжата Escape, то чистим переменные и выходим
                 if event.key == pygame.K_ESCAPE:
                     clear_vars()
                     return None
+                # Если нажат пробел, сбрасываем уровень
                 elif event.key == pygame.K_SPACE:
                     clear_vars()
                     start_time = pygame.time.get_ticks()
                     player, level_x, level_y = generate_level(level)
 
-        if pygame.time.get_ticks() - last_pressed > 200:
+        # Движение
+        if pygame.time.get_ticks() - last_pressed > 250:
             last_pressed = pygame.time.get_ticks()
             buttons = pygame.key.get_pressed()
             if buttons[pygame.K_UP]:
@@ -235,26 +286,46 @@ def runner(screen, level):
             elif buttons[pygame.K_RIGHT]:
                 player.move(1, 0)
 
-        if len(pygame.sprite.groupcollide(box_group, win_group, None, None)) == len(win_group):
-            break
-
+        # Отрисовываем тайлы
         tiles_group.draw(screen)
+        player_group.update()
         player_group.draw(screen)
         box_group.draw(screen)
 
+        # Рисуем секундомер
         timer_text = font.render(f"Время: {(pygame.time.get_ticks() - start_time) // 1000} сек.",
                                  True, (255, 255, 255), (0, 128, 0))
         screen.blit(timer_text, (10, 10))
 
+        clock.tick(5)
+
+        # Если все ящики на месте, то победа
+        if len(pygame.sprite.groupcollide(box_group, win_group, None, None)) == len(win_group):
+            # Отрисовываем полупрозрачный прямоугольник
+            rectangle = pygame.surface.Surface((width // 6 + width // 2, height // 2 + height // 6))
+            rectangle.set_alpha(200)
+            rectangle.fill((255, 255, 255))
+            screen.blit(rectangle, (width // 6, height // 6))
+            pygame.display.flip()
+            while True:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        exit()
+                    # Если нажата кнопка, выходим
+                    elif event.type == pygame.KEYDOWN:
+                        return None
+
         pygame.display.flip()
 
 
+# Чистим все переменные
 def clear_vars():
     global all_sprites, tiles_group, wall_group, box_group, win_group, player_group, cursor_group
     for i in (all_sprites, tiles_group, wall_group, box_group, win_group, player_group, cursor_group):
         i.empty()
 
 
+# Сохраняем уровень в файл
 def save_level(level, name):
     new = level.copy()
     for k, i in enumerate(level):
@@ -265,16 +336,22 @@ def save_level(level, name):
         f.close()
 
 
+# Меню
 def menu(screen):
+    # Определяем шрифты
     font = pygame.font.Font(None, 110)
-    text1 = font.render("СКЛАД 12", True, (0, 100, 50))
-    background = load_image("background.png")
     font2 = pygame.font.Font(None, 50)
+    font3 = pygame.font.Font(None, 25)
 
+    # Рендерим статичные тексты
+    text1 = font.render("СКЛАД 12", True, (0, 100, 50))
     choose_lvl_text = font2.render("Выберите уровень", True, (0, 0, 0))
+    editor_text = font3.render("Нажмите E, чтобы открыть редактор", True, (0, 0, 0))
 
+    background = load_image("background.png")
     running = True
 
+    # Загружаем список уровней
     files = os.listdir("data/levels")
     files = sorted(files, key=lambda x: int(x[:-4]))
     now_file = files[0]
@@ -284,43 +361,59 @@ def menu(screen):
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                # по нажатию на стрелки меняем выбранный уровень
                 if event.key == pygame.K_RIGHT:
                     now_file = files[(files.index(now_file) + 1) % len(files)]
                 elif event.key == pygame.K_LEFT:
                     now_file = files[(files.index(now_file) - 1) % len(files)]
+                # По нажатию на пробел запускаем уровень
                 elif event.key == pygame.K_SPACE:
                     clear_vars()
                     runner(screen, load_level(now_file))
+                # По нажатию на E запускаем редактор
                 elif event.key == pygame.K_e:
                     level = editor(screen)
+                    # берём название
                     if int(files[-1][:-4]) >= 1000:
                         name = int(files[-1][:-4]) + 1
                         name = str(name) + ".txt"
                     else:
                         name = "1000.txt"
+                    # Сохраняем
                     save_level(level, name)
+                    # Обновляем список уровней
+                    files = os.listdir("data/levels")
+                    files = sorted(files, key=lambda x: int(x[:-4]))
 
+        # Отрисовываем фон
         screen.fill((0, 0, 0))
         screen.blit(background, (0, 0))
 
+        # Отрисовываем полупрозрачный прямоугольник
         rectangle = pygame.surface.Surface((width // 6 + width // 2, height // 2 + height // 10))
         rectangle.set_alpha(200)
         rectangle.fill((255, 255, 255))
         screen.blit(rectangle, (width // 6, height // 10))
 
+        # Отрисовываем название
         place = text1.get_rect(center=(width // 2, height // 4))
         screen.blit(text1, place)
 
+        # Отрисовываем выбранный уровень
         text_now_level = font2.render(now_file[:-4], True, (0, 0, 0))
         place = text_now_level.get_rect(center=(width // 2, height // 2))
         screen.blit(text_now_level, place)
 
+        # Отрисовываем статичный текст выбора уровня
         place = choose_lvl_text.get_rect(center=(width // 2, height // 2 - 45))
         screen.blit(choose_lvl_text, place)
+
+        # Отрисовываем текст о редакторе
+        place = editor_text.get_rect(center=(width // 2, height // 2 + 90))
+        screen.blit(editor_text, place)
 
         pygame.display.flip()
 
 
-running = True
-
-menu(screen)
+if __name__ == "__main__":
+    menu(screen)
