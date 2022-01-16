@@ -147,7 +147,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.rect.move(x, y)
         # Если будет столкновение с стеной и ящиком или выйдет за пределы экрана, то возвращаем предыдущее положение
         if any([pygame.sprite.spritecollideany(self, i) for i in (wall_group, box_group)]) or not (
-                0 <= self.rect.x <= width) or not (0 <= self.rect.y <= height):
+                0 <= self.rect.x < width) or not (0 <= self.rect.y < height):
             self.rect = last_rect
 
 
@@ -169,7 +169,7 @@ class Box(pygame.sprite.Sprite):
         # Если будет столкновение с стеной и ящиком или выйдет за пределы экрана, то возвращаем предыдущее положение
         if pygame.sprite.spritecollideany(self, wall_group) or \
                 len(pygame.sprite.spritecollide(self, box_group, None)) > 1 or not (
-                0 <= self.rect.x <= width) or not (0 <= self.rect.y <= height):
+                0 <= self.rect.x < width) or not (0 <= self.rect.y < height):
             self.rect = last_rect
         # Иначе обновляем координаты согласно клеточному полю
         else:
