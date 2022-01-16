@@ -469,7 +469,9 @@ def menu(screen):
                     score = runner(screen, load_level(now_file))
                     # Сохраняем рекорд
                     if score is not None:
-                        scores[now_file] = score
+                        # Сравниваем
+                        if now_file not in scores or score < scores[now_file]:
+                            scores[now_file] = score
                         with open("scores.yml", "w") as file:
                             file.write(yaml.dump(scores))
                             file.close()
