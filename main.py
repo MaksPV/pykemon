@@ -384,6 +384,10 @@ def runner(screen, level):
             # Обновляем экран
             pygame.display.flip()
 
+            # Звук победы
+            sound = pygame.mixer.Sound("data/sounds/win.ogg")
+            sound.play()
+
             while True:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
@@ -419,11 +423,13 @@ def menu(screen):
     scores = dict()
     try:
         with open("scores.yml", "r") as file:
-            scores = yaml.load(file)
+            scores = yaml.load(file, yaml.Loader)
             file.close()
     except:
         # Если нет их, создаём новый файл
         open("scores.yml", "w")
+    if scores is None:
+        scores = dict()
 
     # Определяем шрифты
     font = pygame.font.Font(None, 110)
@@ -442,6 +448,10 @@ def menu(screen):
     files = os.listdir("data/levels")
     files = sorted(files, key=lambda x: int(x[:-4]))
     now_file = files[0]
+
+    # Фоновая музыка
+    pygame.mixer.music.load('data/sounds/menu.mp3')
+    pygame.mixer.music.play(-1, 0, 5)
 
     while running:
         for event in pygame.event.get():
@@ -465,6 +475,7 @@ def menu(screen):
                             file.close()
                 # По нажатию на E запускаем редактор
                 elif event.key == pygame.K_e:
+                    clear_vars()
                     level = editor(screen)
                     # Если уровень не None, то ок
                     if level is not None:
