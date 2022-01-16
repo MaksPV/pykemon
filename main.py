@@ -1,6 +1,7 @@
 import pygame
 import os
 import sys
+import yaml
 
 pygame.init()
 pygame.display.set_caption('Склад 12')
@@ -55,7 +56,7 @@ tile_images = {
     'wall': load_image('wall.png'),
     'box': load_image('box.png'),
     "win": load_image('win.png'),
-    "player": load_image('mario.png', -1)
+    "player": load_image('pika.png')
 }
 
 player_image = tile_images["player"]
@@ -104,7 +105,7 @@ class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(player_group, all_sprites)
         self.frames = dict()
-        self.cut_sheet(load_image("pikachu1.png", -1), 2, 4)
+        self.cut_sheet(load_image("pikachu.png"), 2, 4)
         self.cur_frame = 0
         self.last_step = (1, 0)
         self.image = self.frames[self.last_step][self.cur_frame]
@@ -389,7 +390,7 @@ def runner(screen, level):
                         exit()
                     # Если нажата кнопка, выходим
                     elif event.type == pygame.KEYDOWN:
-                        return None
+                        return time_
 
         pygame.display.flip()
 
@@ -414,6 +415,16 @@ def save_level(level, name):
 
 # Меню
 def menu(screen):
+    # Загружаем рекроды
+    scores = dict()
+    try:
+        with open("scores.yml", "r") as file:
+            scores = yaml.load(file)
+            file.close()
+    except:
+        # Если нет их, создаём новый файл
+        open("scores.yml", "w")
+
     # Определяем шрифты
     font = pygame.font.Font(None, 110)
     font2 = pygame.font.Font(None, 50)
@@ -445,7 +456,13 @@ def menu(screen):
                 # По нажатию на пробел запускаем уровень
                 elif event.key == pygame.K_SPACE:
                     clear_vars()
-                    runner(screen, load_level(now_file))
+                    score = runner(screen, load_level(now_file))
+                    # Сохраняем рекорд
+                    if score is not None:
+                        scores[now_file] = score
+                        with open("scores.yml", "w") as file:
+                            file.write(yaml.dump(scores))
+                            file.close()
                 # По нажатию на E запускаем редактор
                 elif event.key == pygame.K_e:
                     level = editor(screen)
@@ -485,6 +502,15 @@ def menu(screen):
         # Отрисовываем статичный текст выбора уровня
         place = choose_lvl_text.get_rect(center=(width // 2, height // 2 - 45))
         screen.blit(choose_lvl_text, place)
+
+        # Отрисовываем рекорд
+        if now_file not in scores:
+            record = "-"
+        else:
+            record = scores[now_file]
+        record_text = font3.render(f"Рекорд: {record} секунд(ы)", True, (0, 0, 0))
+        place = record_text.get_rect(center=(width // 2, height // 2 + 45))
+        screen.blit(record_text, place)
 
         # Отрисовываем текст о редакторе
         place = editor_text.get_rect(center=(width // 2, height // 2 + 90))
